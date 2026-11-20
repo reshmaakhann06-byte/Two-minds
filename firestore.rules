@@ -1,0 +1,491 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isValidMemberUids(uids) {
+      return uids is list &&
+             uids.size() >= 1 &&
+             uids.size() <= 2 &&
+             uids[0] is string &&
+             uids[0].size() >= 1 &&
+             uids[0].size() <= 128 &&
+             (uids.size() == 1 || (uids[1] is string && uids[1].size() >= 1 && uids[1].size() <= 128));
+    }
+
+    function isWorkspaceMember(workspaceId) {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/workspaces/$(workspaceId)) &&
+             request.auth.uid in get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.memberUids;
+    }
+
+    // --- ENTITY VALIDATION HELPERS ---
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.role in ['me', 'ubaid', 'unassigned'] &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 60 &&
+             data.themeMode in ['dark', 'light', 'system'] &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() <= 240)) &&
+             (!('notificationsEnabled' in data) || data.notificationsEnabled is bool) &&
+             (!('disappearingMessagesSec' in data) || (data.disappearingMessagesSec is int && data.disappearingMessagesSec >= 0 && data.disappearingMessagesSec <= 2592000)) &&
+             (!('blockedPartner' in data) || data.blockedPartner is bool) &&
+             (!('deviceInfo' in data) || (data.deviceInfo is string && data.deviceInfo.size() <= 120));
+    }
+
+    function isValidWorkspace(data) {
+      return data.workspaceName is string && data.workspaceName.size() >= 1 && data.workspaceName.size() <= 80 &&
+             isValidMemberUids(data.memberUids);
+    }
+
+    function isValidMemberProfile(data) {
+      return data.ownerUid is string && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128 &&
+             data.role in ['me', 'ubaid'] &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 60 &&
+             data.online is bool &&
+             data.typingInChat is bool &&
+             data.overallPercent is int && data.overallPercent >= 0 && data.overallPercent <= 100 &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() <= 240)) &&
+             (!('lastSeenEpochMs' in data) || (data.lastSeenEpochMs is int && data.lastSeenEpochMs >= 0)) &&
+             (!('tasksDone' in data) || (data.tasksDone is int && data.tasksDone >= 0 && data.tasksDone <= 100)) &&
+             (!('tasksTotal' in data) || (data.tasksTotal is int && data.tasksTotal >= 0 && data.tasksTotal <= 100)) &&
+             (!('quranMinutes' in data) || (data.quranMinutes is int && data.quranMinutes >= 0 && data.quranMinutes <= 1440)) &&
+             (!('quranPage' in data) || (data.quranPage is int && data.quranPage >= 0 && data.quranPage <= 1000)) &&
+             (!('currentSurah' in data) || (data.currentSurah is string && data.currentSurah.size() <= 80)) &&
+             (!('workoutCompleted' in data) || data.workoutCompleted is bool) &&
+             (!('tasbeehCount' in data) || (data.tasbeehCount is int && data.tasbeehCount >= 0 && data.tasbeehCount <= 100000)) &&
+             (!('waterGlasses' in data) || (data.waterGlasses is int && data.waterGlasses >= 0 && data.waterGlasses <= 30)) &&
+             (!('sleepHours' in data) || (data.sleepHours is number && data.sleepHours >= 0 && data.sleepHours <= 24)) &&
+             (!('namazStates' in data) || (data.namazStates is list && data.namazStates.size() <= 10)) &&
+             (!('checklistStates' in data) || (data.checklistStates is list && data.checklistStates.size() <= 20)) &&
+             (!('sunnatStates' in data) || (data.sunnatStates is list && data.sunnatStates.size() <= 20)) &&
+             (!('weeklyScores' in data) || (data.weeklyScores is list && data.weeklyScores.size() <= 7));
+    }
+
+    function isValidChatMessage(data) {
+      return data.senderUid is string && data.senderUid.size() >= 1 && data.senderUid.size() <= 128 &&
+             data.senderRole in ['me', 'ubaid'] &&
+             isValidMemberUids(data.memberUids) &&
+             data.ciphertext is string && data.ciphertext.size() >= 1 && data.ciphertext.size() <= 60000 &&
+             data.ivBase64 is string && data.ivBase64.size() >= 1 && data.ivBase64.size() <= 128 &&
+             data.messageType in ['text', 'image', 'video', 'file', 'voice', 'location', 'sticker'] &&
+             data.edited is bool &&
+             data.deleted is bool &&
+             data.pinned is bool &&
+             data.readByUids is list && data.readByUids.size() <= 4 && (data.readByUids.size() == 0 || data.readByUids[0] is string) &&
+             (!('attachmentName' in data) || (data.attachmentName is string && data.attachmentName.size() <= 200)) &&
+             (!('attachmentSizeBytes' in data) || (data.attachmentSizeBytes is int && data.attachmentSizeBytes >= 0 && data.attachmentSizeBytes <= 104857600)) &&
+             (!('durationSec' in data) || (data.durationSec is int && data.durationSec >= 0 && data.durationSec <= 3600)) &&
+             (!('replyToId' in data) || (data.replyToId is string && data.replyToId.size() <= 128)) &&
+             (!('replyPreviewCipher' in data) || (data.replyPreviewCipher is string && data.replyPreviewCipher.size() <= 2000)) &&
+             (!('replyPreviewIv' in data) || (data.replyPreviewIv is string && data.replyPreviewIv.size() <= 128)) &&
+             (!('reaction' in data) || (data.reaction is string && data.reaction.size() <= 24)) &&
+             (!('expiresAtEpochMs' in data) || (data.expiresAtEpochMs is int && data.expiresAtEpochMs >= 0));
+    }
+
+    function isValidCallSession(data) {
+      return data.callerUid is string && data.callerUid.size() >= 1 && data.callerUid.size() <= 128 &&
+             data.callerRole in ['me', 'ubaid'] &&
+             isValidMemberUids(data.memberUids) &&
+             data.callType in ['voice', 'video'] &&
+             data.status in ['ringing', 'active', 'ended', 'declined'];
+    }
+
+    function isValidBusinessItem(data) {
+      return data.createdByUid is string && data.createdByUid.size() >= 1 && data.createdByUid.size() <= 128 &&
+             isValidMemberUids(data.memberUids) &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 60 &&
+             data.assigneeRole in ['me', 'ubaid', 'both'] &&
+             data.completed is bool &&
+             (!('driveUrl' in data) || (data.driveUrl is string && data.driveUrl.size() <= 500)) &&
+             (!('driveType' in data) || (data.driveType is string && data.driveType.size() <= 40));
+    }
+
+    function isValidBookNote(data) {
+      return data.authorUid is string && data.authorUid.size() >= 1 && data.authorUid.size() <= 128 &&
+             data.authorRole in ['me', 'ubaid'] &&
+             isValidMemberUids(data.memberUids) &&
+             data.bookId is string && data.bookId.size() >= 1 && data.bookId.size() <= 80 &&
+             data.content is string && data.content.size() >= 1 && data.content.size() <= 2000 &&
+             (!('pageNumber' in data) || (data.pageNumber is int && data.pageNumber >= 0 && data.pageNumber <= 5000));
+    }
+
+    function isValidTradeEntry(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.symbol is string && data.symbol.size() >= 1 && data.symbol.size() <= 20 &&
+             data.side in ['BUY', 'SELL'] &&
+             data.quantity is number && data.quantity > 0 && data.quantity <= 1000000000 &&
+             data.priceUsd is number && data.priceUsd > 0 && data.priceUsd <= 100000000 &&
+             data.totalUsd is number && data.totalUsd > 0 && data.totalUsd <= 100000000000 &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 300));
+    }
+
+    function isValidPriceAlert(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.symbol is string && data.symbol.size() >= 1 && data.symbol.size() <= 20 &&
+             data.targetPrice is number && data.targetPrice > 0 && data.targetPrice <= 100000000 &&
+             data.condition in ['above', 'below'] &&
+             data.active is bool &&
+             data.triggered is bool;
+    }
+
+    function isValidCustomBook(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 160 &&
+             data.author is string && data.author.size() >= 1 && data.author.size() <= 120 &&
+             data.uriString is string && data.uriString.size() >= 1 && data.uriString.size() <= 1000 &&
+             data.forRole in ['me', 'ubaid', 'both'] &&
+             data.currentPage is int && data.currentPage >= 0 && data.currentPage <= 10000 &&
+             data.totalPages is int && data.totalPages >= 1 && data.totalPages <= 10000;
+    }
+
+    // --- 1. USERS COLLECTION & SUBCOLLECTIONS ---
+    match /users/{userId} {
+      allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'role', 'displayName', 'themeMode', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'role', 'displayName', 'bio', 'themeMode', 'notificationsEnabled', 'disappearingMessagesSec', 'blockedPartner', 'deviceInfo', 'createdAt', 'updatedAt']) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName', 'bio', 'themeMode', 'notificationsEnabled', 'disappearingMessagesSec', 'blockedPartner', 'deviceInfo', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+      match /trades/{tradeId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         isValidId(tradeId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'symbol', 'side', 'quantity', 'priceUsd', 'totalUsd', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'symbol', 'side', 'quantity', 'priceUsd', 'totalUsd', 'notes', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidTradeEntry(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(tradeId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidTradeEntry(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['notes', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(tradeId) && request.auth.uid == userId;
+      }
+
+      match /priceAlerts/{alertId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         isValidId(alertId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'symbol', 'targetPrice', 'condition', 'active', 'triggered', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'symbol', 'targetPrice', 'condition', 'active', 'triggered', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidPriceAlert(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(alertId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidPriceAlert(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['active', 'triggered', 'targetPrice', 'condition', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(alertId) && request.auth.uid == userId;
+      }
+
+      match /customBooks/{bookId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         isValidId(bookId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'title', 'author', 'uriString', 'forRole', 'currentPage', 'totalPages', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'author', 'uriString', 'forRole', 'currentPage', 'totalPages', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidCustomBook(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(bookId) &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidCustomBook(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['currentPage', 'totalPages', 'title', 'author', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(bookId) && request.auth.uid == userId;
+      }
+    }
+
+    // --- 2. WORKSPACES & COLLABORATION SUBCOLLECTIONS ---
+    match /workspaces/{workspaceId} {
+      allow get: if isSignedIn() && isValidId(workspaceId) && request.auth.uid in existing().memberUids;
+      allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+      allow create: if isSignedIn() &&
+                       isValidId(workspaceId) &&
+                       request.auth.uid in incoming().memberUids &&
+                       incoming().keys().hasAll(['workspaceName', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['workspaceName', 'memberUids', 'createdAt', 'updatedAt']) &&
+                       isValidTimestamp(incoming().createdAt) &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidWorkspace(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(workspaceId) &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidTimestamp(incoming().updatedAt) &&
+                       isValidWorkspace(incoming()) &&
+                       (
+                         (request.auth.uid in existing().memberUids &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['workspaceName', 'memberUids', 'updatedAt'])) ||
+                         (existing().memberUids.size() < 2 &&
+                          !(request.auth.uid in existing().memberUids) &&
+                          request.auth.uid in incoming().memberUids &&
+                          incoming().memberUids.hasAll(existing().memberUids) &&
+                          incoming().memberUids.size() == existing().memberUids.size() + 1 &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['memberUids', 'updatedAt']))
+                       );
+
+      allow delete: if false;
+
+      // Member Profiles (me / ubaid): Partner read-only, Owner write-only!
+      match /memberProfiles/{roleId} {
+        allow get: if isSignedIn() &&
+                      isValidId(workspaceId) &&
+                      (roleId == 'me' || roleId == 'ubaid') &&
+                      isWorkspaceMember(workspaceId);
+
+        allow list: if false; // Always read via direct DocumentReference ("me" / "ubaid")
+
+        allow create: if isSignedIn() &&
+                         isValidId(workspaceId) &&
+                         (roleId == 'me' || roleId == 'ubaid') &&
+                         isWorkspaceMember(workspaceId) &&
+                         incoming().ownerUid == request.auth.uid &&
+                         incoming().role == roleId &&
+                         incoming().keys().hasAll(['ownerUid', 'role', 'displayName', 'online', 'typingInChat', 'overallPercent', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly([
+                           'ownerUid', 'role', 'displayName', 'bio', 'online', 'typingInChat', 'lastSeenEpochMs',
+                           'tasksDone', 'tasksTotal', 'quranMinutes', 'quranPage', 'quranTotalPages', 'currentSurah',
+                           'workoutCompleted', 'overallPercent', 'deenPercent', 'readingPercent', 'skillsPercent',
+                           'businessPercent', 'fitnessPercent', 'languagePercent', 'tasbeehLabel', 'tasbeehCount',
+                           'tasbeehTarget', 'waterGlasses', 'sleepHours', 'currentBookTitle', 'currentBookProgress',
+                           'dailyPagesRead', 'dailyPagesTarget', 'activeSkillTrack', 'activeLanguage',
+                           'languageWordsLearned', 'namazStates', 'checklistStates', 'sunnatStates', 'weeklyScores',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidMemberProfile(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(workspaceId) &&
+                         (roleId == 'me' || roleId == 'ubaid') &&
+                         isWorkspaceMember(workspaceId) &&
+                         existing().ownerUid == request.auth.uid &&
+                         incoming().ownerUid == existing().ownerUid &&
+                         incoming().role == existing().role &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidMemberProfile(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'displayName', 'bio', 'online', 'typingInChat', 'lastSeenEpochMs',
+                           'tasksDone', 'tasksTotal', 'quranMinutes', 'quranPage', 'quranTotalPages', 'currentSurah',
+                           'workoutCompleted', 'overallPercent', 'deenPercent', 'readingPercent', 'skillsPercent',
+                           'businessPercent', 'fitnessPercent', 'languagePercent', 'tasbeehLabel', 'tasbeehCount',
+                           'tasbeehTarget', 'waterGlasses', 'sleepHours', 'currentBookTitle', 'currentBookProgress',
+                           'dailyPagesRead', 'dailyPagesTarget', 'activeSkillTrack', 'activeLanguage',
+                           'languageWordsLearned', 'namazStates', 'checklistStates', 'sunnatStates', 'weeklyScores',
+                           'updatedAt'
+                         ]);
+
+        allow delete: if false;
+      }
+
+      // Live E2E Encrypted Chat Messages
+      match /messages/{messageId} {
+        allow get: if isSignedIn() && isValidId(workspaceId) && isValidId(messageId) && request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(workspaceId) &&
+                         isValidId(messageId) &&
+                         isWorkspaceMember(workspaceId) &&
+                         incoming().senderUid == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         incoming().keys().hasAll(['senderUid', 'senderRole', 'memberUids', 'ciphertext', 'ivBase64', 'messageType', 'edited', 'deleted', 'pinned', 'readByUids', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly([
+                           'senderUid', 'senderRole', 'memberUids', 'ciphertext', 'ivBase64', 'messageType',
+                           'attachmentName', 'attachmentSizeBytes', 'durationSec', 'replyToId', 'replyPreviewCipher',
+                           'replyPreviewIv', 'edited', 'deleted', 'pinned', 'reaction', 'readByUids', 'expiresAtEpochMs',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidChatMessage(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(workspaceId) &&
+                         isValidId(messageId) &&
+                         request.auth.uid in existing().memberUids &&
+                         incoming().senderUid == existing().senderUid &&
+                         incoming().senderRole == existing().senderRole &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidChatMessage(incoming()) &&
+                         (
+                           // Action 1: Sender edits/deletes or syncs memberUids
+                           (existing().senderUid == request.auth.uid &&
+                            incoming().diff(existing()).affectedKeys().hasOnly(['ciphertext', 'ivBase64', 'edited', 'deleted', 'pinned', 'reaction', 'readByUids', 'memberUids', 'updatedAt'])) ||
+                           // Action 2: Partner marks read, reacts, or pins
+                           (incoming().diff(existing()).affectedKeys().hasOnly(['readByUids', 'reaction', 'pinned', 'updatedAt']))
+                         );
+
+        allow delete: if isSignedIn() && isValidId(workspaceId) && isValidId(messageId) && existing().senderUid == request.auth.uid;
+      }
+
+      // Live Call Signaling
+      match /calls/{callId} {
+        allow get: if isSignedIn() && isValidId(workspaceId) && isValidId(callId) && request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(workspaceId) &&
+                         isValidId(callId) &&
+                         isWorkspaceMember(workspaceId) &&
+                         incoming().callerUid == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         incoming().keys().hasAll(['callerUid', 'callerRole', 'memberUids', 'callType', 'status', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['callerUid', 'callerRole', 'memberUids', 'callType', 'status', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidCallSession(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(workspaceId) &&
+                         isValidId(callId) &&
+                         request.auth.uid in existing().memberUids &&
+                         existing().status != 'ended' &&
+                         existing().status != 'declined' &&
+                         incoming().callerUid == existing().callerUid &&
+                         incoming().callerRole == existing().callerRole &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidCallSession(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+        allow delete: if false;
+      }
+
+      // Shared Business Tasks & Google Drive Links
+      match /businessItems/{itemId} {
+        allow get: if isSignedIn() && isValidId(workspaceId) && isValidId(itemId) && request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(workspaceId) &&
+                         isValidId(itemId) &&
+                         isWorkspaceMember(workspaceId) &&
+                         incoming().createdByUid == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         incoming().keys().hasAll(['createdByUid', 'memberUids', 'title', 'category', 'assigneeRole', 'completed', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['createdByUid', 'memberUids', 'title', 'category', 'driveUrl', 'driveType', 'assigneeRole', 'completed', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidBusinessItem(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(workspaceId) &&
+                         isValidId(itemId) &&
+                         request.auth.uid in existing().memberUids &&
+                         incoming().createdByUid == existing().createdByUid &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidBusinessItem(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'driveUrl', 'driveType', 'assigneeRole', 'completed', 'memberUids', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(workspaceId) && isValidId(itemId) && existing().createdByUid == request.auth.uid;
+      }
+
+      // Shared Book Notes & Discussion
+      match /bookNotes/{noteId} {
+        allow get: if isSignedIn() && isValidId(workspaceId) && isValidId(noteId) && request.auth.uid in existing().memberUids;
+        allow list: if isSignedIn() && request.auth.uid in existing().memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(workspaceId) &&
+                         isValidId(noteId) &&
+                         isWorkspaceMember(workspaceId) &&
+                         incoming().authorUid == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         incoming().keys().hasAll(['authorUid', 'authorRole', 'memberUids', 'bookId', 'content', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['authorUid', 'authorRole', 'memberUids', 'bookId', 'content', 'pageNumber', 'createdAt', 'updatedAt']) &&
+                         isValidTimestamp(incoming().createdAt) &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidBookNote(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(workspaceId) &&
+                         isValidId(noteId) &&
+                         existing().authorUid == request.auth.uid &&
+                         incoming().authorUid == existing().authorUid &&
+                         incoming().authorRole == existing().authorRole &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidTimestamp(incoming().updatedAt) &&
+                         isValidBookNote(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['content', 'pageNumber', 'memberUids', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(workspaceId) && isValidId(noteId) && existing().authorUid == request.auth.uid;
+      }
+    }
+  }
+}

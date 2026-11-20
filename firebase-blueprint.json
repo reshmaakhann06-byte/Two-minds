@@ -1,0 +1,251 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private user settings and role binding for an authenticated Google account.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "role": { "type": "string", "enum": ["me", "ubaid", "unassigned"] },
+        "displayName": { "type": "string" },
+        "bio": { "type": "string" },
+        "themeMode": { "type": "string", "enum": ["dark", "light", "system"] },
+        "notificationsEnabled": { "type": "boolean" },
+        "disappearingMessagesSec": { "type": "integer" },
+        "blockedPartner": { "type": "boolean" },
+        "deviceInfo": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["userId", "role", "displayName", "themeMode", "createdAt", "updatedAt"]
+    },
+    "Workspace": {
+      "title": "Workspace",
+      "description": "Shared Two Minds workspace connecting up to two partner UIDs.",
+      "type": "object",
+      "properties": {
+        "workspaceName": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["workspaceName", "memberUids", "createdAt", "updatedAt"]
+    },
+    "MemberProfile": {
+      "title": "MemberProfile",
+      "description": "Live progress, presence, and daily module state for Me or Ubaid (owner-write, partner-read).",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string" },
+        "role": { "type": "string", "enum": ["me", "ubaid"] },
+        "displayName": { "type": "string" },
+        "bio": { "type": "string" },
+        "online": { "type": "boolean" },
+        "typingInChat": { "type": "boolean" },
+        "lastSeenEpochMs": { "type": "integer" },
+        "tasksDone": { "type": "integer" },
+        "tasksTotal": { "type": "integer" },
+        "quranMinutes": { "type": "integer" },
+        "quranPage": { "type": "integer" },
+        "quranTotalPages": { "type": "integer" },
+        "currentSurah": { "type": "string" },
+        "workoutCompleted": { "type": "boolean" },
+        "overallPercent": { "type": "integer" },
+        "deenPercent": { "type": "integer" },
+        "readingPercent": { "type": "integer" },
+        "skillsPercent": { "type": "integer" },
+        "businessPercent": { "type": "integer" },
+        "fitnessPercent": { "type": "integer" },
+        "languagePercent": { "type": "integer" },
+        "tasbeehLabel": { "type": "string" },
+        "tasbeehCount": { "type": "integer" },
+        "tasbeehTarget": { "type": "integer" },
+        "waterGlasses": { "type": "integer" },
+        "sleepHours": { "type": "number" },
+        "currentBookTitle": { "type": "string" },
+        "currentBookProgress": { "type": "integer" },
+        "dailyPagesRead": { "type": "integer" },
+        "dailyPagesTarget": { "type": "integer" },
+        "activeSkillTrack": { "type": "string" },
+        "activeLanguage": { "type": "string" },
+        "languageWordsLearned": { "type": "integer" },
+        "namazStates": { "type": "array" },
+        "checklistStates": { "type": "array" },
+        "sunnatStates": { "type": "array" },
+        "weeklyScores": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["ownerUid", "role", "displayName", "online", "typingInChat", "overallPercent", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "End-to-end encrypted live chat message with media, voice, location, reply, edit, and read receipt support.",
+      "type": "object",
+      "properties": {
+        "senderUid": { "type": "string" },
+        "senderRole": { "type": "string", "enum": ["me", "ubaid"] },
+        "memberUids": { "type": "array" },
+        "ciphertext": { "type": "string" },
+        "ivBase64": { "type": "string" },
+        "messageType": { "type": "string", "enum": ["text", "image", "video", "file", "voice", "location", "sticker"] },
+        "attachmentName": { "type": "string" },
+        "attachmentSizeBytes": { "type": "integer" },
+        "durationSec": { "type": "integer" },
+        "replyToId": { "type": "string" },
+        "replyPreviewCipher": { "type": "string" },
+        "replyPreviewIv": { "type": "string" },
+        "edited": { "type": "boolean" },
+        "deleted": { "type": "boolean" },
+        "pinned": { "type": "boolean" },
+        "reaction": { "type": "string" },
+        "readByUids": { "type": "array" },
+        "expiresAtEpochMs": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["senderUid", "senderRole", "memberUids", "ciphertext", "ivBase64", "messageType", "edited", "deleted", "pinned", "readByUids", "createdAt", "updatedAt"]
+    },
+    "CallSession": {
+      "title": "CallSession",
+      "description": "Live voice and video call signaling between partners.",
+      "type": "object",
+      "properties": {
+        "callerUid": { "type": "string" },
+        "callerRole": { "type": "string", "enum": ["me", "ubaid"] },
+        "memberUids": { "type": "array" },
+        "callType": { "type": "string", "enum": ["voice", "video"] },
+        "status": { "type": "string", "enum": ["ringing", "active", "ended", "declined"] },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["callerUid", "callerRole", "memberUids", "callType", "status", "createdAt", "updatedAt"]
+    },
+    "BusinessItem": {
+      "title": "BusinessItem",
+      "description": "Shared business planning task or Google Drive resource link.",
+      "type": "object",
+      "properties": {
+        "createdByUid": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "driveUrl": { "type": "string" },
+        "driveType": { "type": "string" },
+        "assigneeRole": { "type": "string", "enum": ["me", "ubaid", "both"] },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["createdByUid", "memberUids", "title", "category", "assigneeRole", "completed", "createdAt", "updatedAt"]
+    },
+    "BookNote": {
+      "title": "BookNote",
+      "description": "Shared book takeaways and partner discussion notes.",
+      "type": "object",
+      "properties": {
+        "authorUid": { "type": "string" },
+        "authorRole": { "type": "string", "enum": ["me", "ubaid"] },
+        "memberUids": { "type": "array" },
+        "bookId": { "type": "string" },
+        "content": { "type": "string" },
+        "pageNumber": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["authorUid", "authorRole", "memberUids", "bookId", "content", "createdAt", "updatedAt"]
+    },
+    "TradeEntry": {
+      "title": "TradeEntry",
+      "description": "User-scoped paper trading order and portfolio history entry.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "symbol": { "type": "string" },
+        "side": { "type": "string", "enum": ["BUY", "SELL"] },
+        "quantity": { "type": "number" },
+        "priceUsd": { "type": "number" },
+        "totalUsd": { "type": "number" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["userId", "symbol", "side", "quantity", "priceUsd", "totalUsd", "createdAt", "updatedAt"]
+    },
+    "PriceAlert": {
+      "title": "PriceAlert",
+      "description": "User-scoped trading price alert target.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "symbol": { "type": "string" },
+        "targetPrice": { "type": "number" },
+        "condition": { "type": "string", "enum": ["above", "below"] },
+        "active": { "type": "boolean" },
+        "triggered": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["userId", "symbol", "targetPrice", "condition", "active", "triggered", "createdAt", "updatedAt"]
+    },
+    "CustomBook": {
+      "title": "CustomBook",
+      "description": "User-added PDF book metadata and reading progress.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "author": { "type": "string" },
+        "uriString": { "type": "string" },
+        "forRole": { "type": "string", "enum": ["me", "ubaid", "both"] },
+        "currentPage": { "type": "integer" },
+        "totalPages": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["userId", "title", "author", "uriString", "forRole", "currentPage", "totalPages", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user settings and role binding."
+    },
+    "/workspaces/{workspaceId}": {
+      "schema": { "$ref": "#/entities/Workspace" },
+      "description": "Shared Two Minds workspace document."
+    },
+    "/workspaces/{workspaceId}/memberProfiles/{roleId}": {
+      "schema": { "$ref": "#/entities/MemberProfile" },
+      "description": "Live member progress and presence for Me and Ubaid."
+    },
+    "/workspaces/{workspaceId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "E2E encrypted real-time chat messages."
+    },
+    "/workspaces/{workspaceId}/calls/{callId}": {
+      "schema": { "$ref": "#/entities/CallSession" },
+      "description": "Voice and video call signaling."
+    },
+    "/workspaces/{workspaceId}/businessItems/{itemId}": {
+      "schema": { "$ref": "#/entities/BusinessItem" },
+      "description": "Shared business tasks and Google Drive resources."
+    },
+    "/workspaces/{workspaceId}/bookNotes/{noteId}": {
+      "schema": { "$ref": "#/entities/BookNote" },
+      "description": "Shared book takeaways and discussion."
+    },
+    "/users/{userId}/trades/{tradeId}": {
+      "schema": { "$ref": "#/entities/TradeEntry" },
+      "description": "User's paper trading history."
+    },
+    "/users/{userId}/priceAlerts/{alertId}": {
+      "schema": { "$ref": "#/entities/PriceAlert" },
+      "description": "User's trading price alerts."
+    },
+    "/users/{userId}/customBooks/{bookId}": {
+      "schema": { "$ref": "#/entities/CustomBook" },
+      "description": "User's imported PDF books."
+    }
+  }
+}

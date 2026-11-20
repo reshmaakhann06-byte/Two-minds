@@ -1,0 +1,6 @@
+{
+  "name": "Two Minds",
+  "description": "Shared daily growth, Deen, book reading, skills, business, trading, language learning, fitness, and encrypted live chat companion app for two partners.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
